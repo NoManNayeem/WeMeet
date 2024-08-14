@@ -20,6 +20,11 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    
+    'channels',
+    "daphne",
+
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -68,6 +73,23 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'project_name.wsgi.application'
+ASGI_APPLICATION = 'project_name.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": [('127.0.0.1', 6379)],
+#         },
+#     },
+# }
 
 
 # Database
@@ -117,6 +139,34 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+
+# These directories will be searched for additional static files
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',  # Your app-level static files
+]
+
+# The directory where static files will be collected (used in production)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (user-uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Production settings (when DEBUG is False)
+if not DEBUG:
+    # Compress static files (CSS, JS, etc.) before serving them
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+    # You can use WhiteNoise to serve static files directly by Django (if not using a separate server for static files)
+    MIDDLEWARE = [
+        'whitenoise.middleware.WhiteNoiseMiddleware',  # Add WhiteNoise middleware
+        # Other middlewares...
+    ]
+
+    # Ensure collectstatic collects files to the STATIC_ROOT directory
+    STATICFILES_DIRS = []
+
+    
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

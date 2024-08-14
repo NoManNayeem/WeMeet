@@ -86,6 +86,12 @@ This project aims to create a minimal backend for a video meeting and chatting p
    - The API will be available at `http://127.0.0.1:8000/`.
    - You can use tools like Postman or Curl to interact with the API.
 
+
+8. ** If using `daphne` **:
+```bash
+pip install daphne
+daphne -p 8000 project_name.asgi:application
+```
 ## Notes
 - This project is intended to be minimal. Future expansions might include more advanced features, scalability improvements, and frontend integration with NextJS.
 - Ensure you are using the latest versions of Django, DRF, and other dependencies as of 2024 to maintain compatibility and security.
