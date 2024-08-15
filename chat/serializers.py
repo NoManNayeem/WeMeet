@@ -6,6 +6,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email']
+        ref_name = 'ChatAppUserSerializer'  # Unique ref_name to avoid conflicts
 
 class ChatGroupSerializer(serializers.ModelSerializer):
     members = UserSerializer(many=True, read_only=True)
@@ -26,10 +27,9 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 class MeetingChatMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
-    meeting = serializers.StringRelatedField()  # or use a custom MeetingSerializer if more details are needed
+    meeting = serializers.StringRelatedField()  # You can replace with a custom MeetingSerializer if needed
 
     class Meta:
         model = MeetingChatMessage
         fields = ['id', 'meeting', 'sender', 'message', 'timestamp']
         read_only_fields = ['sender', 'timestamp']
-

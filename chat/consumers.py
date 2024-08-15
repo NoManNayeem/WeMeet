@@ -1,99 +1,87 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.core.exceptions import ObjectDoesNotExist
-from .models import ChatMessage, Meeting
+from django.contrib.auth.models import User
+from .models import ChatMessage, ChatGroup, MeetingChatMessage
+from meeting.models import Meeting
 import logging
 
 logger = logging.getLogger(__name__)
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.meeting_id = self.scope['url_route']['kwargs']['meeting_id']
-        self.room_group_name = f'chat_{self.meeting_id}'
+        self.room_name = self.scope['url_route']['kwargs']['room_name']
+        self.room_group_name = f'chat_{self.room_name}'
 
-        # Check if the meeting exists
-        try:
-            self.meeting = await database_sync_to_async(Meeting.objects.get)(id=self.meeting_id)
-        except Meeting.DoesNotExist:
-            # If the meeting does not exist, reject the WebSocket connection
-            await self.close()
-            return
-
-        # Set the user status to active
-        self.scope['user'].profile.status = True
-        await database_sync_to_async(self.scope['user'].profile.save)()
-
-        # Join room group
+        # Join the room group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
 
-        await self.accept()
+        # Set the user status to active
+        self.scope['user'].profile.status = True
+        await database_sync_to_async(self.scope['user'].profile.save)()
 
-        # Notify others that a user has joined
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': f'{self.scope["user"].username} has joined the chat.',
-            }
-        )
+        await self.accept()
 
     async def disconnect(self, close_code):
         # Set the user status to inactive
         self.scope['user'].profile.status = False
         await database_sync_to_async(self.scope['user'].profile.save)()
 
-        # Notify others that a user has left
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': f'{self.scope["user"].username} has left the chat.',
-            }
-        )
-
-        # Leave room group
+        # Leave the room group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
         )
 
-    # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
+        room_type = text_data_json.get('room_type')  # either 'private', 'group', or 'meeting'
 
-        try:
-            # Save the message to the database
+        if room_type == 'private':
+            recipient_id = text_data_json['recipient_id']
+            recipient = await database_sync_to_async(User.objects.get)(id=recipient_id)
             await database_sync_to_async(ChatMessage.objects.create)(
-                meeting=self.meeting,
-                user=self.scope["user"],
+                sender=self.scope['user'],
+                recipient=recipient,
+                message=message
+            )
+        elif room_type == 'group':
+            group_id = text_data_json['group_id']
+            group = await database_sync_to_async(ChatGroup.objects.get)(id=group_id)
+            await database_sync_to_async(ChatMessage.objects.create)(
+                sender=self.scope['user'],
+                group=group,
+                message=message
+            )
+        elif room_type == 'meeting':
+            meeting_id = text_data_json['meeting_id']
+            meeting = await database_sync_to_async(Meeting.objects.get)(id=meeting_id)
+            await database_sync_to_async(MeetingChatMessage.objects.create)(
+                sender=self.scope['user'],
+                meeting=meeting,
                 message=message
             )
 
-            # Broadcast the message to the room group
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': message,
-                }
-            )
-        except ObjectDoesNotExist as e:
-            logger.error(f"Object does not exist: {e}")
-            await self.send(text_data=json.dumps({'error': 'Meeting or User does not exist'}))
-        except Exception as e:
-            logger.error(f"Error saving chat message: {e}")
-            await self.send(text_data=json.dumps({'error': 'Error saving message'}))
+        # Broadcast the message to the room group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message': message,
+                'sender': self.scope['user'].username
+            }
+        )
 
-    # Receive message from room group
     async def chat_message(self, event):
         message = event['message']
+        sender = event['sender']
 
-        # Send message to WebSocket
+        # Send the message to the WebSocket
         await self.send(text_data=json.dumps({
-            'message': message
+            'message': message,
+            'sender': sender
         }))
