@@ -6,7 +6,7 @@ from django.contrib import admin
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Video Meeting & Chatting API",
+        title="WeMeet API",
         default_version='v1',
         description="API documentation for the Video Meeting & Chatting platform",
         terms_of_service="https://www.google.com/policies/terms/",
